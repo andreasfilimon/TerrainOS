@@ -1,0 +1,64 @@
+name: Build
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main, develop]
+
+jobs:
+  build-msvc:
+    name: MSVC (Windows)
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup MSVC
+        uses: microsoft/setup-msbuild@v2
+
+      - name: Add MSVC to PATH
+        uses: ilammy/msvc-dev-cmd@v1
+
+      - name: Build Contour (MSVC)
+        working-directory: contour
+        run: |
+          if (Test-Path "main.c") {
+            cl /O2 /W4 /WX `
+              main.c desktop.c panel.c d2d_renderer.c win32_helpers.c `
+              /Fe:contour.exe `
+              /link d2d1.lib dwrite.lib user32.lib gdi32.lib shell32.lib ole32.lib
+          } else {
+            Write-Host "No source files yet — skipping build"
+          }
+        shell: pwsh
+
+  build-mingw:
+    name: MinGW (Windows)
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup MinGW
+        uses: msys2/setup-msys2@v2
+        with:
+          msystem: MINGW64
+          install: >-
+            mingw-w64-x86_64-gcc
+            mingw-w64-x86_64-cmake
+
+      - name: Build Contour (MinGW)
+        working-directory: contour
+        shell: msys2 {0}
+        run: |
+          if [ -f "main.c" ]; then
+            gcc -O2 -Wall -Wextra \
+              main.c desktop.c panel.c d2d_renderer.c win32_helpers.c \
+              -o contour.exe \
+              -ld2d1 -ldwrite -luser32 -lgdi32 -lshell32 -lole32
+          else
+            echo "No source files yet — skipping build"
+          fi
